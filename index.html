@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Earwise — Interval Trainer</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">earwise <span>interval trainer</span></div>
+    <div class="header-actions">
+      <button class="btn btn-ghost btn-icon" id="btn-settings-home" title="Settings">⚙</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ── HOME ────────────────────────────────────────────── -->
+    <section id="screen-home" class="screen">
+      <div class="home-hero">
+        <h1>Train Your Ear</h1>
+        <p>Adaptive interval training that meets you where you are and grows with you.</p>
+        <div class="home-cta">
+          <button class="btn btn-primary btn-start" id="btn-start-session">▶ Start Session</button>
+        </div>
+      </div>
+
+      <div class="stats-bar">
+        <div class="stat-card">
+          <div class="stat-value" id="stat-sessions">0</div>
+          <div class="stat-label">Sessions</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-questions">0</div>
+          <div class="stat-label">Questions</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-accuracy">—</div>
+          <div class="stat-label">Accuracy</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-streak">0</div>
+          <div class="stat-label">Day Streak</div>
+        </div>
+      </div>
+
+      <div class="section-title">Mastery Progress</div>
+      <div id="mastery-grid"></div>
+    </section>
+
+    <!-- ── QUESTION ─────────────────────────────────────────── -->
+    <section id="screen-question" class="screen">
+      <div class="progress-bar-wrap">
+        <div class="progress-track"><div id="progress-fill" style="width:0%"></div></div>
+        <div id="progress-label">0 / 0</div>
+      </div>
+
+      <div class="question-header">
+        <div id="direction-badge" class="direction-badge dir-ascending">▲ Ascending</div>
+        <div id="new-badge" class="hidden">New!</div>
+        <button class="btn btn-ghost btn-icon" id="btn-home-from-question" title="End session">✕</button>
+      </div>
+
+      <div class="play-area">
+        <button class="btn btn-primary btn-play-big" id="btn-play">
+          <span class="play-icon">▶</span> Play Interval
+        </button>
+        <button class="btn btn-secondary hidden" id="btn-replay">↺ Replay</button>
+      </div>
+
+      <div id="answer-buttons"></div>
+
+      <div id="feedback-area" class="feedback-area hidden"></div>
+
+      <div class="question-actions">
+        <button class="btn btn-primary hidden" id="btn-next">Next →</button>
+      </div>
+    </section>
+
+    <!-- ── SUMMARY ──────────────────────────────────────────── -->
+    <section id="screen-summary" class="screen">
+      <div class="summary-card">
+        <div id="summary-emoji">🎉</div>
+        <div id="summary-score">0 / 0</div>
+        <div id="summary-pct">0%</div>
+      </div>
+
+      <div id="summary-unlocks" class="hidden"></div>
+      <div id="summary-changes" class="hidden"></div>
+
+      <div class="summary-actions">
+        <button class="btn btn-secondary" id="btn-home-from-summary">← Home</button>
+        <button class="btn btn-primary" id="btn-session-again">▶ Another Session</button>
+      </div>
+    </section>
+
+    <!-- ── SETTINGS ─────────────────────────────────────────── -->
+    <section id="screen-settings" class="screen">
+      <div class="settings-title">Settings</div>
+
+      <div class="setting-group">
+        <div class="settings-section-label">Session</div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Auto-play interval</div>
+            <div class="setting-desc">Play automatically when a new question appears</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="setting-autoplay" checked />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Auto-advance on correct</div>
+            <div class="setting-desc">Skip to next question after a correct answer</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="setting-autoadvance" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Questions per session</div>
+          </div>
+          <select class="setting-select" id="setting-session-size">
+            <option value="10">10</option>
+            <option value="15">15</option>
+            <option value="20" selected>20</option>
+            <option value="25">25</option>
+            <option value="30">30</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <div class="settings-section-label">Feedback</div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Show reference songs</div>
+            <div class="setting-desc">When to show the mnemonic song list</div>
+          </div>
+          <select class="setting-select" id="setting-songs">
+            <option value="always">Always</option>
+            <option value="wrong" selected>On wrong answers</option>
+            <option value="never">Never</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <div class="settings-section-label">Data</div>
+        <div class="setting-row">
+          <div class="setting-label">Export progress</div>
+          <button class="btn btn-secondary" id="btn-export">Export JSON</button>
+        </div>
+        <div class="setting-row">
+          <div class="setting-label">Import progress</div>
+          <button class="btn btn-secondary" id="btn-import">Import JSON</button>
+          <input type="file" id="import-file" accept=".json" class="hidden" />
+        </div>
+      </div>
+
+      <div class="settings-danger">
+        <div>
+          <div class="setting-label">Reset all progress</div>
+          <div class="setting-desc">Clears all mastery data and history</div>
+        </div>
+        <button class="btn btn-danger" id="btn-reset">Reset</button>
+      </div>
+
+      <div class="settings-actions">
+        <button class="btn btn-secondary" id="btn-settings-cancel">Cancel</button>
+        <button class="btn btn-primary" id="btn-settings-save">Save Settings</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Scripts (order matters: data → engine → logic → ui → main) -->
+<script src="js/intervals.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/srs.js"></script>
+<script src="js/progression.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
