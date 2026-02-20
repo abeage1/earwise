@@ -1,5 +1,7 @@
 # earwise — Adaptive Interval Ear Trainer
 
+**[▶ Live app →](https://abeage1.github.io/earwise/)**
+
 A static HTML/JS music interval ear training app with adaptive learning, spaced repetition, and progressive interval unlocking.
 
 ## Features
