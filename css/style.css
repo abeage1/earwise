@@ -307,9 +307,10 @@ main { flex: 1; padding: 24px 0 32px; }
   font-size: 0.8rem;
   font-weight: 600;
 }
-.dir-ascending  { background: #1a2a4a; color: #6c8fff; border: 1px solid #2a3a6a; }
-.dir-descending { background: #2a1a3a; color: #c478ff; border: 1px solid #4a2a6a; }
-.dir-harmonic   { background: #1a3a2a; color: #4adf9f; border: 1px solid #2a5a3a; }
+.dir-ascending   { background: #1a2a4a; color: #6c8fff; border: 1px solid #2a3a6a; }
+.dir-descending  { background: #2a1a3a; color: #c478ff; border: 1px solid #4a2a6a; }
+.dir-harmonic    { background: #1a3a2a; color: #4adf9f; border: 1px solid #2a5a3a; }
+.dir-progression { background: #2a2010; color: #f39c12; border: 1px solid #4a3a20; }
 
 #new-badge {
   background: var(--amber);
@@ -651,4 +652,5 @@ main { flex: 1; padding: 24px 0 32px; }
   .mastery-label .full { display: none; }
   .mastery-label { width: 44px; }
   .home-hero h1 { font-size: 1.6rem; }
+  .module-tab { padding: 9px 8px; font-size: 0.82rem; }
 }

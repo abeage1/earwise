@@ -27,8 +27,9 @@ const UI = (() => {
   }
 
   function _renderModuleTabs() {
-    $('tab-intervals').classList.toggle('active', _app.activeModule === 'intervals');
-    $('tab-chords').classList.toggle('active', _app.activeModule === 'chords');
+    $('tab-intervals').classList.toggle('active',    _app.activeModule === 'intervals');
+    $('tab-chords').classList.toggle('active',       _app.activeModule === 'chords');
+    $('tab-progressions').classList.toggle('active', _app.activeModule === 'progressions');
   }
 
   function _renderHomeStats() {
@@ -47,6 +48,8 @@ const UI = (() => {
 
     if (_app.activeModule === 'chords') {
       _renderChordMasteryGrid(container);
+    } else if (_app.activeModule === 'progressions') {
+      _renderProgressionMasteryGrid(container);
     } else {
       _renderIntervalMasteryGrid(container);
     }
@@ -96,6 +99,27 @@ const UI = (() => {
     }
   }
 
+  function _renderProgressionMasteryGrid(container) {
+    for (const prog of PROGRESSIONS) {
+      const row = document.createElement('div');
+      row.className = 'mastery-row';
+
+      const label = document.createElement('div');
+      label.className = 'mastery-label';
+      label.innerHTML = `<span class="short">${prog.name}</span>`;
+      row.appendChild(label);
+
+      const bars = document.createElement('div');
+      bars.className = 'mastery-bars mastery-bars--single';
+
+      const card = _app.progDeck.getCard(prog.id);
+      bars.appendChild(_makeMasteryCell(card, '♫'));
+
+      row.appendChild(bars);
+      container.appendChild(row);
+    }
+  }
+
   function _makeMasteryCell(card, iconLabel) {
     const cell = document.createElement('div');
     cell.className = 'mastery-cell';
@@ -132,6 +156,9 @@ const UI = (() => {
     if (module === 'chords') {
       dirEl.textContent = '⧫ Chord';
       dirEl.className = 'direction-badge dir-harmonic';
+    } else if (module === 'progressions') {
+      dirEl.textContent = '♫ Progression';
+      dirEl.className = 'direction-badge dir-progression';
     } else {
       dirEl.textContent = _dirLabel(card.direction);
       dirEl.className = 'direction-badge dir-' + card.direction;
@@ -147,7 +174,9 @@ const UI = (() => {
     if (isNewCard) {
       const label = module === 'chords'
         ? `New: ${CHORD_MAP[card.intervalId].name}`
-        : `New: ${INTERVAL_MAP[card.intervalId].name} (${card.direction})`;
+        : module === 'progressions'
+          ? `New: ${PROGRESSION_MAP[card.intervalId].name}`
+          : `New: ${INTERVAL_MAP[card.intervalId].name} (${card.direction})`;
       newBadge.classList.remove('hidden');
       newBadge.textContent = label;
     } else {
@@ -174,6 +203,8 @@ const UI = (() => {
 
     if (module === 'chords') {
       _renderChordAnswerButtons(container);
+    } else if (module === 'progressions') {
+      _renderProgressionAnswerButtons(container);
     } else {
       _renderIntervalAnswerButtons(container);
     }
@@ -204,6 +235,22 @@ const UI = (() => {
         chord.id,
         chord.short,
         chord.name,
+        idx,
+        id => _app.handleAnswer(id)
+      );
+      container.appendChild(btn);
+    });
+  }
+
+  function _renderProgressionAnswerButtons(container) {
+    const activeIds = _app.progDeck.activeCards().map(c => c.intervalId);
+    const sorted = PROGRESSIONS.filter(p => activeIds.includes(p.id));
+
+    sorted.forEach((prog, idx) => {
+      const btn = _makeAnswerBtn(
+        prog.id,
+        prog.name,
+        '',
         idx,
         id => _app.handleAnswer(id)
       );
@@ -255,6 +302,8 @@ const UI = (() => {
 
     if (module === 'chords') {
       _renderChordFeedback(feedbackEl, correct, card, selectedId);
+    } else if (module === 'progressions') {
+      _renderProgressionFeedback(feedbackEl, correct, card, selectedId);
     } else {
       _renderIntervalFeedback(feedbackEl, correct, card, selectedId);
     }
@@ -311,6 +360,31 @@ const UI = (() => {
     feedbackEl.innerHTML = html;
   }
 
+  function _renderProgressionFeedback(feedbackEl, correct, card, selectedId) {
+    const prog = PROGRESSION_MAP[card.intervalId];
+    const selected = selectedId ? PROGRESSION_MAP[selectedId] : null;
+
+    let html = correct
+      ? `<div class="feedback-icon">✓</div>
+         <div class="feedback-text">Correct! <strong>${prog.name}</strong></div>
+         <div class="chord-character">${prog.character}</div>`
+      : `<div class="feedback-icon">✗</div>
+         <div class="feedback-text">The answer was <strong>${prog.name}</strong>${selected ? ` (you chose <strong>${selected.name}</strong>)` : ''}</div>
+         <div class="chord-character">${prog.character}</div>`;
+
+    const showSongs = _app.settings.showSongsOn === 'always' ||
+                     (_app.settings.showSongsOn === 'wrong' && !correct);
+    if (showSongs && prog.songs.length > 0) {
+      html += `<div class="songs-section"><div class="songs-title">Reference songs:</div><ul class="songs-list">`;
+      for (const song of prog.songs) {
+        html += `<li><strong>${song.title}</strong> — ${song.hint}</li>`;
+      }
+      html += `</ul></div>`;
+    }
+
+    feedbackEl.innerHTML = html;
+  }
+
   // ── SESSION SUMMARY ─────────────────────────────────────────────────────────
   function renderSummary({ correct, total, newUnlocks, masteryChanges, module }) {
     showScreen('screen-summary');
@@ -327,6 +401,9 @@ const UI = (() => {
         if (module === 'chords') {
           const ch = CHORD_MAP[u.chordId];
           return `<li>🔓 <strong>${ch.name}</strong> chord</li>`;
+        } else if (module === 'progressions') {
+          const prog = PROGRESSION_MAP[u.progId];
+          return `<li>🔓 <strong>${prog.name}</strong> progression</li>`;
         } else {
           const iv = INTERVAL_MAP[u.intervalId];
           return `<li>🔓 <strong>${iv.name}</strong> ${_dirLabel(u.direction)}</li>`;
@@ -346,7 +423,9 @@ const UI = (() => {
         .map(ch => {
           const label = module === 'chords'
             ? `${CHORD_MAP[ch.itemId].short} ⧫`
-            : `${INTERVAL_MAP[ch.itemId].short} ${_dirIcon(ch.direction)}`;
+            : module === 'progressions'
+              ? `${PROGRESSION_MAP[ch.itemId].name} ♫`
+              : `${INTERVAL_MAP[ch.itemId].short} ${_dirIcon(ch.direction)}`;
           const sign  = ch.delta >= 0 ? '+' : '';
           const color = ch.delta >= 0 ? '#2ecc71' : '#e74c3c';
           return `<div class="change-row">
@@ -383,8 +462,9 @@ const UI = (() => {
   // ── STATIC EVENT BINDING ────────────────────────────────────────────────────
   function _bindStaticEvents() {
     // Module tabs
-    $('tab-intervals').addEventListener('click', () => _app.setModule('intervals'));
-    $('tab-chords').addEventListener('click',    () => _app.setModule('chords'));
+    $('tab-intervals').addEventListener('click',    () => _app.setModule('intervals'));
+    $('tab-chords').addEventListener('click',       () => _app.setModule('chords'));
+    $('tab-progressions').addEventListener('click', () => _app.setModule('progressions'));
 
     // Nav
     $('btn-start-session').addEventListener('click',  () => _app.startSession());
