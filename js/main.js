@@ -9,12 +9,8 @@ const App = {
   chordDeck: null,
   chordProgression: null,
 
-  // Progression module
-  progDeck: null,
-  progUnlocker: null,
-
   // Shared state
-  activeModule: 'intervals', // 'intervals' | 'chords' | 'progressions'
+  activeModule: 'intervals', // 'intervals' | 'chords'
   settings: null,
   stats: null,
   session: null,      // { queue, index, correct, total, masterySnapshots, answeredThisSession, module }
@@ -23,14 +19,12 @@ const App = {
   seenCards: new Set(),
 
   init() {
-    this.deck             = Storage.loadDeck()              || new SRSDeck();
-    this.progression      = Storage.loadProgression(this.deck);
-    this.chordDeck        = Storage.loadChordDeck()         || new ChordDeck();
+    this.deck            = Storage.loadDeck()             || new SRSDeck();
+    this.progression     = Storage.loadProgression(this.deck);
+    this.chordDeck       = Storage.loadChordDeck()        || new ChordDeck();
     this.chordProgression = Storage.loadChordProgression(this.chordDeck);
-    this.progDeck         = Storage.loadProgressionDeck()   || new ProgressionDeck();
-    this.progUnlocker     = Storage.loadProgressionUnlocker(this.progDeck);
-    this.settings         = Storage.loadSettings();
-    this.stats            = Storage.loadStats();
+    this.settings        = Storage.loadSettings();
+    this.stats           = Storage.loadStats();
     UI.init(this);
     this._save();
   },
@@ -45,25 +39,20 @@ const App = {
   // ── Session ────────────────────────────────────────────────────────────────
 
   startSession() {
-    const mod = this.activeModule;
+    const isChords = this.activeModule === 'chords';
 
     // Check for unlocks before building session
-    if (mod === 'chords') {
+    if (isChords) {
       const unlocks = this.chordProgression.checkUnlocks();
-      if (unlocks.length > 0) this._save();
-    } else if (mod === 'progressions') {
-      const unlocks = this.progUnlocker.checkUnlocks();
       if (unlocks.length > 0) this._save();
     } else {
       const unlocks = this.progression.checkUnlocks();
       if (unlocks.length > 0) this._save();
     }
 
-    const queue = mod === 'chords'
+    const queue = isChords
       ? this.chordProgression.buildSession(this.settings.sessionSize)
-      : mod === 'progressions'
-        ? this.progUnlocker.buildSession(this.settings.sessionSize)
-        : this.progression.buildSession(this.settings.sessionSize);
+      : this.progression.buildSession(this.settings.sessionSize);
 
     if (queue.length === 0) {
       UI.toast('No items to practice yet!', 'error');
@@ -125,9 +114,6 @@ const App = {
     if (this.session.module === 'chords') {
       const chord = CHORD_MAP[this.currentCard.intervalId];
       Audio.playChord(chord.semitones).then(onDone);
-    } else if (this.session.module === 'progressions') {
-      const prog = PROGRESSION_MAP[this.currentCard.intervalId];
-      Audio.playProgression(prog.chords).then(onDone);
     } else {
       const interval = INTERVAL_MAP[this.currentCard.intervalId];
       Audio.play(interval.semitones, this.currentCard.direction).then(onDone);
@@ -170,19 +156,15 @@ const App = {
   },
 
   _endSession() {
-    const mod = this.session.module;
-    const newUnlocks = mod === 'chords'
+    const isChords = this.session.module === 'chords';
+    const newUnlocks = isChords
       ? this.chordProgression.checkUnlocks()
-      : mod === 'progressions'
-        ? this.progUnlocker.checkUnlocks()
-        : this.progression.checkUnlocks();
+      : this.progression.checkUnlocks();
 
     const masteryChanges = Object.entries(this.session.masterySnapshots)
       .filter(([id]) => this.session.answeredThisSession.has(id))
       .map(([id, before]) => {
-        const deck = mod === 'chords' ? this.chordDeck
-                   : mod === 'progressions' ? this.progDeck
-                   : this.deck;
+        const deck = isChords ? this.chordDeck : this.deck;
         const card = deck.cards[id];
         return {
           itemId: card.intervalId, // chord id or interval id
@@ -240,7 +222,6 @@ const App = {
     Storage.save(
       this.deck, this.progression,
       this.chordDeck, this.chordProgression,
-      this.progDeck, this.progUnlocker,
       this.settings, this.stats
     );
   },
@@ -251,8 +232,6 @@ const App = {
     this.progression      = new Progression(this.deck);
     this.chordDeck        = new ChordDeck();
     this.chordProgression = new ChordProgression(this.chordDeck);
-    this.progDeck         = new ProgressionDeck();
-    this.progUnlocker     = new ProgressionUnlocker(this.progDeck);
     this.settings         = Storage.loadSettings();
     this.stats            = Storage.loadStats();
     this.session          = null;
@@ -265,7 +244,6 @@ const App = {
     const json = Storage.exportJSON(
       this.deck, this.progression,
       this.chordDeck, this.chordProgression,
-      this.progDeck, this.progUnlocker,
       this.settings, this.stats
     );
     const blob = new Blob([json], { type: 'application/json' });
@@ -285,8 +263,6 @@ const App = {
       this.progression      = result.progression;
       this.chordDeck        = result.chordDeck;
       this.chordProgression = result.chordProgression;
-      this.progDeck         = result.progDeck;
-      this.progUnlocker     = result.progUnlocker;
       this.settings         = { ...this.settings, ...result.settings };
       this.stats            = { ...this.stats,    ...result.stats };
       this._save();

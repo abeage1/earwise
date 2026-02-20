@@ -48,22 +48,10 @@ npx serve .
 
 Each chord is played as a **block chord** (all notes simultaneously) followed immediately by an **ascending arpeggio** — giving the ear both the gestalt color and the individual pitches.
 
-## Chord Progression Recognition
-
-8 progressions in pedagogical order (most aurally distinct pairs first):
-
-1. **Pop** (I–V–vi–IV) and **Jazz** (ii7–V7–Imaj7–vi7) — start here
-2. **50s** (I–vi–IV–V) and **Folk** (I–IV–V–I)
-3. **Minor Pop** (vi–IV–I–V) and **Andalusian** (i–VII–VI–V, descending bass)
-4. **Rock** (I–bVII–IV–I) and **Blues** (I7–IV7–I7–V7, all dominant 7ths)
-
-Each progression plays **twice through** so the ear hears the full loop. No Roman numerals are shown — recognition is purely by ear.
-
 ## Roadmap
 
 - [x] Interval recognition (ascending / descending / harmonic)
 - [x] Chord recognition (major / minor / dim / aug / dom7 / maj7 / min7)
-- [x] Chord progression recognition (8 named progressions, adaptive unlocking)
 - [ ] Scale recognition
 - [ ] Melodic dictation
 - [ ] Visual staff notation (VexFlow integration)

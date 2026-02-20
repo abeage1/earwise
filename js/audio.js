@@ -203,62 +203,9 @@ const Audio = (() => {
     return _playChordFreqs(freqs);
   }
 
-  // ── Progression playback ───────────────────────────────────────────────────
-
-  let lastProgressionFreqSets = null;
-
-  function _playProgressionFreqSets(chordFreqSets) {
-    const audioCtx = getCtx();
-    const now = audioCtx.currentTime + 0.05;
-    const chordDuration = 0.9; // seconds per chord (~67 bpm feel)
-    let t = now;
-
-    // Play through the progression twice so the ear hears the loop
-    const passes = [...chordFreqSets, ...chordFreqSets];
-    for (const freqs of passes) {
-      for (const freq of freqs) {
-        buildChordTone(freq, t, chordDuration, audioCtx);
-      }
-      t += chordDuration;
-    }
-
-    const totalDuration = passes.length * chordDuration + 0.35; // +release tail
-    return new Promise(resolve => setTimeout(resolve, totalDuration * 1000));
-  }
-
-  function playProgression(chords) {
-    // chords: array of { rootOffset, quality } from PROGRESSIONS data
-    // Compute safe root MIDI range so all chord roots stay in C3–C5
-    const offsets    = chords.map(c => c.rootOffset);
-    const minOffset  = Math.min(...offsets);
-    const maxOffset  = Math.max(...offsets);
-
-    // minRoot: ensure lowest chord root >= C3 (48)
-    // maxRoot: ensure highest chord root + largest chord interval (11) <= ~C5 (72)
-    const minRoot  = 48 - minOffset;
-    const maxRoot  = Math.min(65, 72 - maxOffset - 7); // 7 = typical chord spread
-    const safeMax  = Math.max(minRoot, maxRoot);
-    const rootMidi = Math.round(minRoot + Math.random() * (safeMax - minRoot));
-
-    const chordFreqSets = chords.map(step => {
-      const chordRootMidi = rootMidi + step.rootOffset;
-      const intervals = CHORD_QUALITIES[step.quality] || [0, 4, 7];
-      return intervals.map(s => midiToFreq(chordRootMidi + s));
-    });
-
-    lastProgressionFreqSets = chordFreqSets;
-    lastChordFreqs = null;
-    lastRootFreq   = null;
-
-    return _playProgressionFreqSets(chordFreqSets);
-  }
-
   // ── Unified replay ─────────────────────────────────────────────────────────
 
   function replay() {
-    if (lastProgressionFreqSets !== null) {
-      return _playProgressionFreqSets(lastProgressionFreqSets);
-    }
     if (lastChordFreqs !== null) {
       return _playChordFreqs(lastChordFreqs);
     }
@@ -268,5 +215,5 @@ const Audio = (() => {
     return Promise.resolve();
   }
 
-  return { unlock, play, playChord, playProgression, replay };
+  return { unlock, play, playChord, replay };
 })();
