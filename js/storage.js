@@ -1,17 +1,21 @@
 // storage.js — localStorage persistence
 
 const Storage = (() => {
-  const KEY_DECK = 'earwise_deck_v1';
+  const KEY_DECK        = 'earwise_deck_v1';
   const KEY_PROGRESSION = 'earwise_progression_v1';
-  const KEY_SETTINGS = 'earwise_settings_v1';
-  const KEY_STATS = 'earwise_stats_v1';
+  const KEY_CHORD_DECK  = 'earwise_chord_deck_v1';
+  const KEY_CHORD_PROG  = 'earwise_chord_prog_v1';
+  const KEY_SETTINGS    = 'earwise_settings_v1';
+  const KEY_STATS       = 'earwise_stats_v1';
 
-  function save(deck, progression, settings, stats) {
+  function save(deck, progression, chordDeck, chordProgression, settings, stats) {
     try {
-      localStorage.setItem(KEY_DECK, JSON.stringify(deck.toJSON()));
+      localStorage.setItem(KEY_DECK,        JSON.stringify(deck.toJSON()));
       localStorage.setItem(KEY_PROGRESSION, JSON.stringify(progression.toJSON()));
-      localStorage.setItem(KEY_SETTINGS, JSON.stringify(settings));
-      localStorage.setItem(KEY_STATS, JSON.stringify(stats));
+      localStorage.setItem(KEY_CHORD_DECK,  JSON.stringify(chordDeck.toJSON()));
+      localStorage.setItem(KEY_CHORD_PROG,  JSON.stringify(chordProgression.toJSON()));
+      localStorage.setItem(KEY_SETTINGS,    JSON.stringify(settings));
+      localStorage.setItem(KEY_STATS,       JSON.stringify(stats));
     } catch (e) {
       console.warn('earwise: could not save to localStorage', e);
     }
@@ -37,6 +41,29 @@ const Storage = (() => {
     } catch (e) {
       console.warn('earwise: could not load progression', e);
       return new Progression(deck);
+    }
+  }
+
+  function loadChordDeck() {
+    try {
+      const raw = localStorage.getItem(KEY_CHORD_DECK);
+      if (!raw) return null;
+      return ChordDeck.fromJSON(JSON.parse(raw));
+    } catch (e) {
+      console.warn('earwise: could not load chord deck', e);
+      return null;
+    }
+  }
+
+  function loadChordProgression(deck) {
+    try {
+      const raw = localStorage.getItem(KEY_CHORD_PROG);
+      const prog = new ChordProgression(deck);
+      if (raw) prog.loadJSON(JSON.parse(raw));
+      return prog;
+    } catch (e) {
+      console.warn('earwise: could not load chord progression', e);
+      return new ChordProgression(deck);
     }
   }
 
@@ -76,38 +103,49 @@ const Storage = (() => {
     }
   }
 
-  function exportJSON(deck, progression, settings, stats) {
+  function exportJSON(deck, progression, chordDeck, chordProgression, settings, stats) {
     const data = {
-      version: 1,
+      version: 2,
       exportDate: new Date().toISOString(),
       deck: deck.toJSON(),
       progression: progression.toJSON(),
+      chordDeck: chordDeck.toJSON(),
+      chordProgression: chordProgression.toJSON(),
       settings,
       stats,
     };
     return JSON.stringify(data, null, 2);
   }
 
-  function importJSON(jsonString, deck, progression) {
+  function importJSON(jsonString) {
     const data = JSON.parse(jsonString);
     if (!data.version || !data.deck) throw new Error('Invalid earwise export file');
+
     const newDeck = SRSDeck.fromJSON(data.deck);
     const newProg = new Progression(newDeck);
     if (data.progression) newProg.loadJSON(data.progression);
+
+    const newChordDeck = data.chordDeck ? ChordDeck.fromJSON(data.chordDeck) : new ChordDeck();
+    const newChordProg = new ChordProgression(newChordDeck);
+    if (data.chordProgression) newChordProg.loadJSON(data.chordProgression);
+
     return {
       deck: newDeck,
       progression: newProg,
+      chordDeck: newChordDeck,
+      chordProgression: newChordProg,
       settings: data.settings || {},
       stats: data.stats || {},
     };
   }
 
   function clear() {
-    localStorage.removeItem(KEY_DECK);
-    localStorage.removeItem(KEY_PROGRESSION);
-    localStorage.removeItem(KEY_SETTINGS);
-    localStorage.removeItem(KEY_STATS);
+    [KEY_DECK, KEY_PROGRESSION, KEY_CHORD_DECK, KEY_CHORD_PROG, KEY_SETTINGS, KEY_STATS]
+      .forEach(k => localStorage.removeItem(k));
   }
 
-  return { save, loadDeck, loadProgression, loadSettings, loadStats, exportJSON, importJSON, clear };
+  return {
+    save, loadDeck, loadProgression, loadChordDeck, loadChordProgression,
+    loadSettings, loadStats, exportJSON, importJSON, clear,
+  };
 })();

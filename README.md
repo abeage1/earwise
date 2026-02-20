@@ -1,8 +1,8 @@
-# earwise — Adaptive Interval Ear Trainer
+# earwise — Adaptive Ear Trainer
 
 **[▶ Live app →](https://abeage1.github.io/earwise/)**
 
-A static HTML/JS music interval ear training app with adaptive learning, spaced repetition, and progressive interval unlocking.
+A static HTML/JS music ear training app with adaptive learning, spaced repetition, and progressive unlocking. Currently trains **interval recognition** and **chord recognition**.
 
 ## Features
 
@@ -37,9 +37,21 @@ or serve with any static file server:
 npx serve .
 ```
 
+## Chord Recognition
+
+7 chord types in pedagogical order:
+1. **Major / Minor** (start here — the most fundamental contrast)
+2. **Diminished**
+3. **Augmented**
+4. **Dominant 7th / Major 7th**
+5. **Minor 7th**
+
+Each chord is played as a **block chord** (all notes simultaneously) followed immediately by an **ascending arpeggio** — giving the ear both the gestalt color and the individual pitches.
+
 ## Roadmap
 
-- [ ] Chord recognition module (major / minor / dim / aug / dom7 / maj7 / min7)
+- [x] Interval recognition (ascending / descending / harmonic)
+- [x] Chord recognition (major / minor / dim / aug / dom7 / maj7 / min7)
 - [ ] Scale recognition
 - [ ] Melodic dictation
 - [ ] Visual staff notation (VexFlow integration)

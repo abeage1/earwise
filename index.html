@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Earwise — Interval Trainer</title>
+  <title>Earwise — Ear Trainer</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
 <div id="app">
   <header>
-    <div class="logo">earwise <span>interval trainer</span></div>
+    <div class="logo">earwise <span>ear trainer</span></div>
     <div class="header-actions">
       <button class="btn btn-ghost btn-icon" id="btn-settings-home" title="Settings">⚙</button>
     </div>
@@ -20,10 +20,16 @@
     <section id="screen-home" class="screen">
       <div class="home-hero">
         <h1>Train Your Ear</h1>
-        <p>Adaptive interval training that meets you where you are and grows with you.</p>
+        <p>Adaptive ear training that meets you where you are and grows with you.</p>
         <div class="home-cta">
           <button class="btn btn-primary btn-start" id="btn-start-session">▶ Start Session</button>
         </div>
+      </div>
+
+      <!-- Module switcher -->
+      <div class="module-tabs">
+        <button class="module-tab active" id="tab-intervals">🎵 Intervals</button>
+        <button class="module-tab" id="tab-chords">🎼 Chords</button>
       </div>
 
       <div class="stats-bar">
@@ -64,7 +70,7 @@
 
       <div class="play-area">
         <button class="btn btn-primary btn-play-big" id="btn-play">
-          <span class="play-icon">▶</span> Play Interval
+          <span class="play-icon">▶</span> Play
         </button>
         <button class="btn btn-secondary hidden" id="btn-replay">↺ Replay</button>
       </div>
@@ -103,7 +109,7 @@
         <div class="settings-section-label">Session</div>
         <div class="setting-row">
           <div>
-            <div class="setting-label">Auto-play interval</div>
+            <div class="setting-label">Auto-play</div>
             <div class="setting-desc">Play automatically when a new question appears</div>
           </div>
           <label class="toggle">
@@ -179,11 +185,13 @@
   </main>
 </div>
 
-<!-- Scripts (order matters: data → engine → logic → ui → main) -->
+<!-- Scripts: data → audio → srs → module logic → storage → ui → main -->
 <script src="js/intervals.js"></script>
+<script src="js/chords.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/srs.js"></script>
 <script src="js/progression.js"></script>
+<script src="js/chord-module.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>

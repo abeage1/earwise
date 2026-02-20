@@ -1,10 +1,8 @@
 // ui.js — DOM rendering and event handling
 
 const UI = (() => {
-  // ── DOM references ──────────────────────────────────────────────────────────
   const $ = id => document.getElementById(id);
 
-  // ── State passed in from main ───────────────────────────────────────────────
   let _app = null;
 
   function init(app) {
@@ -23,17 +21,22 @@ const UI = (() => {
   // ── HOME / DASHBOARD ────────────────────────────────────────────────────────
   function renderHome() {
     showScreen('screen-home');
+    _renderModuleTabs();
     _renderMasteryGrid();
     _renderHomeStats();
   }
 
+  function _renderModuleTabs() {
+    $('tab-intervals').classList.toggle('active', _app.activeModule === 'intervals');
+    $('tab-chords').classList.toggle('active', _app.activeModule === 'chords');
+  }
+
   function _renderHomeStats() {
     const s = _app.stats;
-    $('stat-sessions').textContent = s.totalSessions;
+    $('stat-sessions').textContent  = s.totalSessions;
     $('stat-questions').textContent = s.totalQuestions;
-    $('stat-accuracy').textContent = s.totalQuestions > 0
-      ? Math.round(s.totalCorrect / s.totalQuestions * 100) + '%'
-      : '—';
+    $('stat-accuracy').textContent  = s.totalQuestions > 0
+      ? Math.round(s.totalCorrect / s.totalQuestions * 100) + '%' : '—';
     $('stat-streak').textContent = s.currentStreak;
   }
 
@@ -42,6 +45,14 @@ const UI = (() => {
     if (!container) return;
     container.innerHTML = '';
 
+    if (_app.activeModule === 'chords') {
+      _renderChordMasteryGrid(container);
+    } else {
+      _renderIntervalMasteryGrid(container);
+    }
+  }
+
+  function _renderIntervalMasteryGrid(container) {
     for (const interval of INTERVALS) {
       const row = document.createElement('div');
       row.className = 'mastery-row';
@@ -56,25 +67,7 @@ const UI = (() => {
 
       for (const dir of ['ascending', 'descending', 'harmonic']) {
         const card = _app.deck.getCard(interval.id, dir);
-        const cell = document.createElement('div');
-        cell.className = 'mastery-cell';
-        cell.title = `${interval.name} ${dir}`;
-
-        if (!card || card.isLocked) {
-          cell.classList.add('locked');
-          cell.innerHTML = `<div class="dir-label">${_dirIcon(dir)}</div><div class="bar-track"><div class="bar-fill" style="width:0%"></div></div>`;
-        } else {
-          const pct = Math.round(card.mastery * 100);
-          const hue = Math.round(card.mastery * 120); // red → green
-          cell.innerHTML = `
-            <div class="dir-label">${_dirIcon(dir)}</div>
-            <div class="bar-track">
-              <div class="bar-fill" style="width:${pct}%; background: hsl(${hue},70%,48%)"></div>
-            </div>
-            <div class="bar-pct">${pct}%</div>`;
-        }
-
-        bars.appendChild(cell);
+        bars.appendChild(_makeMasteryCell(card, _dirIcon(dir)));
       }
 
       row.appendChild(bars);
@@ -82,109 +75,177 @@ const UI = (() => {
     }
   }
 
+  function _renderChordMasteryGrid(container) {
+    for (const chord of CHORDS) {
+      const row = document.createElement('div');
+      row.className = 'mastery-row';
+
+      const label = document.createElement('div');
+      label.className = 'mastery-label';
+      label.innerHTML = `<span class="short">${chord.short}</span><span class="full">${chord.name}</span>`;
+      row.appendChild(label);
+
+      const bars = document.createElement('div');
+      bars.className = 'mastery-bars mastery-bars--single';
+
+      const card = _app.chordDeck.getCard(chord.id);
+      bars.appendChild(_makeMasteryCell(card, '⧫'));
+
+      row.appendChild(bars);
+      container.appendChild(row);
+    }
+  }
+
+  function _makeMasteryCell(card, iconLabel) {
+    const cell = document.createElement('div');
+    cell.className = 'mastery-cell';
+    if (!card || card.isLocked) {
+      cell.classList.add('locked');
+      cell.innerHTML = `<div class="dir-label">${iconLabel}</div><div class="bar-track"><div class="bar-fill" style="width:0%"></div></div>`;
+    } else {
+      const pct = Math.round(card.mastery * 100);
+      const hue = Math.round(card.mastery * 120);
+      cell.innerHTML = `
+        <div class="dir-label">${iconLabel}</div>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:${pct}%; background: hsl(${hue},70%,48%)"></div>
+        </div>
+        <div class="bar-pct">${pct}%</div>`;
+    }
+    return cell;
+  }
+
   function _dirIcon(dir) {
     return dir === 'ascending' ? '↑' : dir === 'descending' ? '↓' : '⧫';
   }
 
   // ── SESSION / QUESTION ──────────────────────────────────────────────────────
-  function renderQuestion(card, sessionIndex, sessionTotal, isNewCard) {
+  function renderQuestion(card, sessionIndex, sessionTotal, isNewCard, module) {
     showScreen('screen-question');
 
-    // Progress bar
     const pct = Math.round((sessionIndex / sessionTotal) * 100);
     $('progress-fill').style.width = pct + '%';
     $('progress-label').textContent = `${sessionIndex} / ${sessionTotal}`;
 
-    // Direction badge
+    // Direction / mode badge
     const dirEl = $('direction-badge');
-    const interval = INTERVAL_MAP[card.intervalId];
-    dirEl.textContent = _dirLabel(card.direction);
-    dirEl.className = 'direction-badge dir-' + card.direction;
+    if (module === 'chords') {
+      dirEl.textContent = '⧫ Chord';
+      dirEl.className = 'direction-badge dir-harmonic';
+    } else {
+      dirEl.textContent = _dirLabel(card.direction);
+      dirEl.className = 'direction-badge dir-' + card.direction;
+    }
 
-    // Reset feedback area
+    // Reset feedback
     const feedbackEl = $('feedback-area');
     feedbackEl.className = 'feedback-area hidden';
     feedbackEl.innerHTML = '';
 
-    // New card announcement
+    // New card badge
     const newBadge = $('new-badge');
     if (isNewCard) {
+      const label = module === 'chords'
+        ? `New: ${CHORD_MAP[card.intervalId].name}`
+        : `New: ${INTERVAL_MAP[card.intervalId].name} (${card.direction})`;
       newBadge.classList.remove('hidden');
-      newBadge.textContent = `New: ${interval.name} (${card.direction})`;
+      newBadge.textContent = label;
     } else {
       newBadge.classList.add('hidden');
     }
 
-    // Render answer buttons (only active intervals)
-    _renderAnswerButtons(card);
+    // Answer buttons
+    _renderAnswerButtons(module);
 
-    // Disable buttons until audio finishes
-    _setButtonsEnabled(false);
+    // Button visibility
+    _setAnswerButtonsEnabled(false);
     $('btn-play').classList.remove('hidden');
     $('btn-replay').classList.add('hidden');
+    $('btn-next').classList.add('hidden');
   }
 
   function _dirLabel(dir) {
     return dir === 'ascending' ? '▲ Ascending' : dir === 'descending' ? '▼ Descending' : '⧫ Harmonic';
   }
 
-  function _renderAnswerButtons(currentCard) {
+  function _renderAnswerButtons(module) {
     const container = $('answer-buttons');
     container.innerHTML = '';
 
-    // Get all unlocked interval IDs (deduplicated)
-    const activeIntervalIds = [...new Set(
-      _app.deck.activeCards().map(c => c.intervalId)
-    )];
+    if (module === 'chords') {
+      _renderChordAnswerButtons(container);
+    } else {
+      _renderIntervalAnswerButtons(container);
+    }
+  }
 
-    // Sort by semitone count
-    const sorted = INTERVALS.filter(i => activeIntervalIds.includes(i.id));
+  function _renderIntervalAnswerButtons(container) {
+    const activeIds = [...new Set(_app.deck.activeCards().map(c => c.intervalId))];
+    const sorted = INTERVALS.filter(i => activeIds.includes(i.id));
 
     sorted.forEach((interval, idx) => {
-      const btn = document.createElement('button');
-      btn.className = 'answer-btn';
-      btn.dataset.intervalId = interval.id;
-      btn.innerHTML = `
-        <span class="key-hint">${idx + 1 <= 9 ? idx + 1 : idx === 9 ? '0' : ''}</span>
-        <span class="interval-short">${interval.short}</span>
-        <span class="interval-full">${interval.name}</span>`;
-
-      btn.addEventListener('click', () => {
-        if (!btn.disabled) _app.handleAnswer(interval.id);
-      });
-
+      const btn = _makeAnswerBtn(
+        interval.id,
+        interval.short,
+        interval.name,
+        idx,
+        id => _app.handleAnswer(id)
+      );
       container.appendChild(btn);
     });
   }
 
-  function _setButtonsEnabled(enabled) {
-    document.querySelectorAll('.answer-btn').forEach(btn => {
-      btn.disabled = !enabled;
+  function _renderChordAnswerButtons(container) {
+    const activeIds = _app.chordDeck.activeCards().map(c => c.intervalId);
+    const sorted = CHORDS.filter(c => activeIds.includes(c.id));
+
+    sorted.forEach((chord, idx) => {
+      const btn = _makeAnswerBtn(
+        chord.id,
+        chord.short,
+        chord.name,
+        idx,
+        id => _app.handleAnswer(id)
+      );
+      container.appendChild(btn);
     });
-    const replayBtn = $('btn-replay');
-    if (replayBtn) replayBtn.disabled = !enabled;
   }
 
-  // Called when audio finishes playing — enable answer buttons
+  function _makeAnswerBtn(id, shortLabel, fullLabel, idx, onClick) {
+    const btn = document.createElement('button');
+    btn.className = 'answer-btn';
+    btn.dataset.id = id;
+    const keyHint = idx < 9 ? idx + 1 : idx === 9 ? '0' : '';
+    btn.innerHTML = `
+      <span class="key-hint">${keyHint}</span>
+      <span class="interval-short">${shortLabel}</span>
+      <span class="interval-full">${fullLabel}</span>`;
+    btn.addEventListener('click', () => { if (!btn.disabled) onClick(id); });
+    return btn;
+  }
+
+  function _setAnswerButtonsEnabled(enabled) {
+    document.querySelectorAll('.answer-btn').forEach(btn => { btn.disabled = !enabled; });
+  }
+
   function enableAnswering() {
-    _setButtonsEnabled(true);
+    _setAnswerButtonsEnabled(true);
     $('btn-play').classList.add('hidden');
     $('btn-replay').classList.remove('hidden');
   }
 
-  // ── FEEDBACK after answer ───────────────────────────────────────────────────
-  function renderFeedback(correct, card, selectedIntervalId) {
+  // ── FEEDBACK ────────────────────────────────────────────────────────────────
+  function renderFeedback(correct, card, selectedId, module) {
     // Disable answer buttons but keep replay enabled
     document.querySelectorAll('.answer-btn').forEach(btn => { btn.disabled = true; });
 
-    const interval = INTERVAL_MAP[card.intervalId];
-    const selected = INTERVAL_MAP[selectedIntervalId];
+    const correctId = card.intervalId;
 
-    // Highlight correct button green, wrong button red
+    // Highlight buttons
     document.querySelectorAll('.answer-btn').forEach(btn => {
-      if (btn.dataset.intervalId === card.intervalId) {
+      if (btn.dataset.id === correctId) {
         btn.classList.add('correct');
-      } else if (!correct && btn.dataset.intervalId === selectedIntervalId) {
+      } else if (!correct && btn.dataset.id === selectedId) {
         btn.classList.add('wrong');
       }
     });
@@ -192,16 +253,23 @@ const UI = (() => {
     const feedbackEl = $('feedback-area');
     feedbackEl.className = 'feedback-area ' + (correct ? 'feedback-correct' : 'feedback-wrong');
 
+    if (module === 'chords') {
+      _renderChordFeedback(feedbackEl, correct, card, selectedId);
+    } else {
+      _renderIntervalFeedback(feedbackEl, correct, card, selectedId);
+    }
+
+    feedbackEl.classList.remove('hidden');
+  }
+
+  function _renderIntervalFeedback(feedbackEl, correct, card, selectedId) {
+    const interval = INTERVAL_MAP[card.intervalId];
+    const selected = INTERVAL_MAP[selectedId];
+
     let html = correct
       ? `<div class="feedback-icon">✓</div><div class="feedback-text">Correct! <strong>${interval.name}</strong></div>`
-      : `<div class="feedback-icon">✗</div><div class="feedback-text">The answer was <strong>${interval.name}</strong>`;
+      : `<div class="feedback-icon">✗</div><div class="feedback-text">The answer was <strong>${interval.name}</strong>${selected ? ` (you chose <strong>${selected.name}</strong>)` : ''}</div>`;
 
-    if (!correct && selected) {
-      html += ` (you chose <strong>${selected.name}</strong>)`;
-    }
-    if (!correct) html += `</div>`;
-
-    // Reference songs
     const showSongs = _app.settings.showSongsOn === 'always' ||
                      (_app.settings.showSongsOn === 'wrong' && !correct);
     if (showSongs) {
@@ -216,31 +284,55 @@ const UI = (() => {
     }
 
     feedbackEl.innerHTML = html;
-    feedbackEl.classList.remove('hidden');
+  }
+
+  function _renderChordFeedback(feedbackEl, correct, card, selectedId) {
+    const chord = CHORD_MAP[card.intervalId];
+    const selected = selectedId ? CHORD_MAP[selectedId] : null;
+
+    let html = correct
+      ? `<div class="feedback-icon">✓</div>
+         <div class="feedback-text">Correct! <strong>${chord.name}</strong></div>
+         <div class="chord-character">${chord.character}</div>`
+      : `<div class="feedback-icon">✗</div>
+         <div class="feedback-text">The answer was <strong>${chord.name}</strong>${selected ? ` (you chose <strong>${selected.name}</strong>)` : ''}</div>
+         <div class="chord-character">${chord.character}</div>`;
+
+    const showSongs = _app.settings.showSongsOn === 'always' ||
+                     (_app.settings.showSongsOn === 'wrong' && !correct);
+    if (showSongs && chord.songs.length > 0) {
+      html += `<div class="songs-section"><div class="songs-title">Reference songs:</div><ul class="songs-list">`;
+      for (const song of chord.songs) {
+        html += `<li><strong>${song.title}</strong> — ${song.hint}</li>`;
+      }
+      html += `</ul></div>`;
+    }
+
+    feedbackEl.innerHTML = html;
   }
 
   // ── SESSION SUMMARY ─────────────────────────────────────────────────────────
-  function renderSummary(sessionResult) {
+  function renderSummary({ correct, total, newUnlocks, masteryChanges, module }) {
     showScreen('screen-summary');
 
-    const { correct, total, newUnlocks, masteryChanges } = sessionResult;
     const pct = total > 0 ? Math.round(correct / total * 100) : 0;
-
     $('summary-score').textContent = `${correct} / ${total}`;
-    $('summary-pct').textContent = `${pct}%`;
-
-    // Emoji based on score
-    let emoji = pct >= 90 ? '🎉' : pct >= 70 ? '👍' : pct >= 50 ? '💪' : '🔄';
-    $('summary-emoji').textContent = emoji;
+    $('summary-pct').textContent   = `${pct}%`;
+    $('summary-emoji').textContent = pct >= 90 ? '🎉' : pct >= 70 ? '👍' : pct >= 50 ? '💪' : '🔄';
 
     // New unlocks
     const unlocksEl = $('summary-unlocks');
     if (newUnlocks && newUnlocks.length > 0) {
-      unlocksEl.innerHTML = '<h3>New unlocks!</h3><ul>' +
-        newUnlocks.map(u => {
+      const items = newUnlocks.map(u => {
+        if (module === 'chords') {
+          const ch = CHORD_MAP[u.chordId];
+          return `<li>🔓 <strong>${ch.name}</strong> chord</li>`;
+        } else {
           const iv = INTERVAL_MAP[u.intervalId];
           return `<li>🔓 <strong>${iv.name}</strong> ${_dirLabel(u.direction)}</li>`;
-        }).join('') + '</ul>';
+        }
+      });
+      unlocksEl.innerHTML = '<h3>New unlocks!</h3><ul>' + items.join('') + '</ul>';
       unlocksEl.classList.remove('hidden');
     } else {
       unlocksEl.classList.add('hidden');
@@ -250,13 +342,15 @@ const UI = (() => {
     const changesEl = $('summary-changes');
     if (masteryChanges && masteryChanges.length > 0) {
       const rows = masteryChanges
-        .sort((a, b) => (b.delta) - (a.delta))
+        .sort((a, b) => b.delta - a.delta)
         .map(ch => {
-          const iv = INTERVAL_MAP[ch.intervalId];
-          const sign = ch.delta >= 0 ? '+' : '';
+          const label = module === 'chords'
+            ? `${CHORD_MAP[ch.itemId].short} ⧫`
+            : `${INTERVAL_MAP[ch.itemId].short} ${_dirIcon(ch.direction)}`;
+          const sign  = ch.delta >= 0 ? '+' : '';
           const color = ch.delta >= 0 ? '#2ecc71' : '#e74c3c';
           return `<div class="change-row">
-            <span>${iv.short} ${_dirIcon(ch.direction)}</span>
+            <span>${label}</span>
             <span style="color:${color}">${sign}${Math.round(ch.delta * 100)}%</span>
           </div>`;
         });
@@ -267,52 +361,49 @@ const UI = (() => {
     }
   }
 
-  // ── SETTINGS PANEL ──────────────────────────────────────────────────────────
+  // ── SETTINGS ────────────────────────────────────────────────────────────────
   function renderSettings() {
     showScreen('screen-settings');
     const s = _app.settings;
-    $('setting-autoplay').checked = s.autoPlay;
+    $('setting-autoplay').checked    = s.autoPlay;
     $('setting-autoadvance').checked = s.autoAdvance;
-    $('setting-songs').value = s.showSongsOn;
-    $('setting-session-size').value = s.sessionSize;
+    $('setting-songs').value         = s.showSongsOn;
+    $('setting-session-size').value  = s.sessionSize;
   }
 
   function collectSettings() {
     return {
-      autoPlay: $('setting-autoplay').checked,
-      autoAdvance: $('setting-autoadvance').checked,
-      showSongsOn: $('setting-songs').value,
-      sessionSize: parseInt($('setting-session-size').value, 10),
+      autoPlay:     $('setting-autoplay').checked,
+      autoAdvance:  $('setting-autoadvance').checked,
+      showSongsOn:  $('setting-songs').value,
+      sessionSize:  parseInt($('setting-session-size').value, 10),
     };
   }
 
   // ── STATIC EVENT BINDING ────────────────────────────────────────────────────
   function _bindStaticEvents() {
+    // Module tabs
+    $('tab-intervals').addEventListener('click', () => _app.setModule('intervals'));
+    $('tab-chords').addEventListener('click',    () => _app.setModule('chords'));
+
     // Nav
-    $('btn-start-session').addEventListener('click', () => _app.startSession());
-    $('btn-settings-home').addEventListener('click', () => renderSettings());
-    $('btn-settings-save').addEventListener('click', () => {
-      _app.saveSettings(collectSettings());
-      renderHome();
-    });
+    $('btn-start-session').addEventListener('click',  () => _app.startSession());
+    $('btn-settings-home').addEventListener('click',  () => renderSettings());
+    $('btn-settings-save').addEventListener('click',  () => { _app.saveSettings(collectSettings()); renderHome(); });
     $('btn-settings-cancel').addEventListener('click', () => renderHome());
-    $('btn-play').addEventListener('click', () => _app.playCurrentInterval());
-    $('btn-replay').addEventListener('click', () => _app.replayInterval());
-    $('btn-next').addEventListener('click', () => _app.nextQuestion());
-    $('btn-session-again').addEventListener('click', () => _app.startSession());
+    $('btn-play').addEventListener('click',           () => _app.playCurrentInterval());
+    $('btn-replay').addEventListener('click',         () => _app.replayInterval());
+    $('btn-next').addEventListener('click',           () => _app.nextQuestion());
+    $('btn-session-again').addEventListener('click',  () => _app.startSession());
     $('btn-home-from-summary').addEventListener('click', () => renderHome());
     $('btn-home-from-question').addEventListener('click', () => {
       if (confirm('End this session early?')) renderHome();
     });
 
-    // Reset confirmation
+    // Reset / export / import
     $('btn-reset').addEventListener('click', () => {
-      if (confirm('Reset ALL progress? This cannot be undone.')) {
-        _app.resetProgress();
-      }
+      if (confirm('Reset ALL progress? This cannot be undone.')) _app.resetProgress();
     });
-
-    // Export / Import
     $('btn-export').addEventListener('click', () => _app.exportData());
     $('btn-import').addEventListener('click', () => $('import-file').click());
     $('import-file').addEventListener('change', e => {
@@ -326,44 +417,26 @@ const UI = (() => {
 
     // Keyboard shortcuts
     document.addEventListener('keydown', e => {
-      if ($('screen-question') && $('screen-question').classList.contains('active')) {
-        const key = e.key;
-        if (key === 'r' || key === 'R') {
-          _app.replayInterval();
-          return;
-        }
-        const num = parseInt(key, 10);
-        if (!isNaN(num)) {
-          const idx = num === 0 ? 9 : num - 1;
-          const btns = document.querySelectorAll('.answer-btn:not(:disabled)');
-          if (btns[idx]) btns[idx].click();
-        }
+      if (!$('screen-question').classList.contains('active')) return;
+      if (e.key === 'r' || e.key === 'R') { _app.replayInterval(); return; }
+      const num = parseInt(e.key, 10);
+      if (!isNaN(num)) {
+        const idx = num === 0 ? 9 : num - 1;
+        const btns = [...document.querySelectorAll('.answer-btn:not([disabled])')];
+        if (btns[idx]) btns[idx].click();
       }
     });
   }
 
-  // ── TOASTS ──────────────────────────────────────────────────────────────────
+  // ── TOAST ───────────────────────────────────────────────────────────────────
   function toast(message, type = 'info') {
     const el = document.createElement('div');
     el.className = `toast toast-${type}`;
     el.textContent = message;
     document.body.appendChild(el);
     requestAnimationFrame(() => el.classList.add('show'));
-    setTimeout(() => {
-      el.classList.remove('show');
-      setTimeout(() => el.remove(), 300);
-    }, 2800);
+    setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 300); }, 2800);
   }
 
-  return {
-    init,
-    renderHome,
-    renderQuestion,
-    enableAnswering,
-    renderFeedback,
-    renderSummary,
-    renderSettings,
-    toast,
-    showScreen,
-  };
+  return { init, renderHome, renderQuestion, enableAnswering, renderFeedback, renderSummary, renderSettings, toast, showScreen };
 })();

@@ -1,31 +1,61 @@
 // main.js — App orchestration
 
 const App = {
+  // Interval module
   deck: null,
   progression: null,
+
+  // Chord module
+  chordDeck: null,
+  chordProgression: null,
+
+  // Shared state
+  activeModule: 'intervals', // 'intervals' | 'chords'
   settings: null,
   stats: null,
-  session: null,
+  session: null,      // { queue, index, correct, total, masterySnapshots, answeredThisSession, module }
   currentCard: null,
   questionStartTime: null,
   seenCards: new Set(),
 
   init() {
-    this.deck = Storage.loadDeck() || new SRSDeck();
-    this.progression = Storage.loadProgression(this.deck);
-    this.settings = Storage.loadSettings();
-    this.stats = Storage.loadStats();
+    this.deck            = Storage.loadDeck()             || new SRSDeck();
+    this.progression     = Storage.loadProgression(this.deck);
+    this.chordDeck       = Storage.loadChordDeck()        || new ChordDeck();
+    this.chordProgression = Storage.loadChordProgression(this.chordDeck);
+    this.settings        = Storage.loadSettings();
+    this.stats           = Storage.loadStats();
     UI.init(this);
     this._save();
   },
 
-  startSession() {
-    const newUnlocks = this.progression.checkUnlocks();
-    if (newUnlocks.length > 0) this._save();
+  // ── Module switching ───────────────────────────────────────────────────────
 
-    const queue = this.progression.buildSession(this.settings.sessionSize);
+  setModule(module) {
+    this.activeModule = module;
+    UI.renderHome();
+  },
+
+  // ── Session ────────────────────────────────────────────────────────────────
+
+  startSession() {
+    const isChords = this.activeModule === 'chords';
+
+    // Check for unlocks before building session
+    if (isChords) {
+      const unlocks = this.chordProgression.checkUnlocks();
+      if (unlocks.length > 0) this._save();
+    } else {
+      const unlocks = this.progression.checkUnlocks();
+      if (unlocks.length > 0) this._save();
+    }
+
+    const queue = isChords
+      ? this.chordProgression.buildSession(this.settings.sessionSize)
+      : this.progression.buildSession(this.settings.sessionSize);
+
     if (queue.length === 0) {
-      UI.toast('No intervals to practice yet!', 'error');
+      UI.toast('No items to practice yet!', 'error');
       return;
     }
 
@@ -37,6 +67,7 @@ const App = {
       masterySnapshots: {},
       newUnlocks: [],
       answeredThisSession: new Set(),
+      module: this.activeModule,
     };
 
     for (const card of queue) {
@@ -62,42 +93,49 @@ const App = {
       !this.seenCards.has(card.id);
 
     this.seenCards.add(card.id);
-    UI.renderQuestion(card, this.session.index, this.session.total, isNew);
+    UI.renderQuestion(card, this.session.index, this.session.total, isNew, this.session.module);
 
     if (this.settings.autoPlay) {
-      this._playInterval();
+      this._playCurrentCard();
     }
   },
 
   playCurrentInterval() {
-    this._playInterval();
+    this._playCurrentCard();
   },
 
-  _playInterval() {
-    const interval = INTERVAL_MAP[this.currentCard.intervalId];
+  _playCurrentCard() {
     this.questionStartTime = null;
-    Audio.play(interval.semitones, this.currentCard.direction).then(() => {
+    const onDone = () => {
       this.questionStartTime = Date.now();
       UI.enableAnswering();
-    });
+    };
+
+    if (this.session.module === 'chords') {
+      const chord = CHORD_MAP[this.currentCard.intervalId];
+      Audio.playChord(chord.semitones).then(onDone);
+    } else {
+      const interval = INTERVAL_MAP[this.currentCard.intervalId];
+      Audio.play(interval.semitones, this.currentCard.direction).then(onDone);
+    }
   },
 
   replayInterval() {
     Audio.replay();
   },
 
-  handleAnswer(selectedIntervalId) {
+  handleAnswer(selectedId) {
     if (!this.currentCard || !this.questionStartTime) return;
 
     const responseMs = Date.now() - this.questionStartTime;
-    const correct = selectedIntervalId === this.currentCard.intervalId;
+    const correct = selectedId === this.currentCard.intervalId;
 
     this.currentCard.update(correct, responseMs);
 
     if (correct) this.session.correct++;
     this.session.answeredThisSession.add(this.currentCard.id);
 
-    UI.renderFeedback(correct, this.currentCard, selectedIntervalId);
+    UI.renderFeedback(correct, this.currentCard, selectedId, this.session.module);
 
     this.stats.totalQuestions++;
     if (correct) this.stats.totalCorrect++;
@@ -118,16 +156,21 @@ const App = {
   },
 
   _endSession() {
-    const newUnlocks = this.progression.checkUnlocks();
+    const isChords = this.session.module === 'chords';
+    const newUnlocks = isChords
+      ? this.chordProgression.checkUnlocks()
+      : this.progression.checkUnlocks();
 
     const masteryChanges = Object.entries(this.session.masterySnapshots)
       .filter(([id]) => this.session.answeredThisSession.has(id))
       .map(([id, before]) => {
-        const card = this.deck.cards[id];
+        const deck = isChords ? this.chordDeck : this.deck;
+        const card = deck.cards[id];
         return {
-          intervalId: card.intervalId,
+          itemId: card.intervalId, // chord id or interval id
           direction: card.direction,
           delta: card.mastery - before,
+          module: this.session.module,
         };
       })
       .filter(ch => Math.abs(ch.delta) > 0.001);
@@ -148,6 +191,7 @@ const App = {
       correct: this.session.correct,
       total: this.session.total,
       newUnlocks: newUnlocks.length,
+      module: this.session.module,
     });
     if (this.stats.sessionHistory.length > 30) this.stats.sessionHistory.shift();
 
@@ -158,10 +202,13 @@ const App = {
       total: this.session.total,
       newUnlocks,
       masteryChanges,
+      module: this.session.module,
     });
 
     this.session = null;
   },
+
+  // ── Settings ───────────────────────────────────────────────────────────────
 
   saveSettings(newSettings) {
     this.settings = { ...this.settings, ...newSettings };
@@ -169,24 +216,36 @@ const App = {
     UI.toast('Settings saved', 'success');
   },
 
+  // ── Persistence ────────────────────────────────────────────────────────────
+
   _save() {
-    Storage.save(this.deck, this.progression, this.settings, this.stats);
+    Storage.save(
+      this.deck, this.progression,
+      this.chordDeck, this.chordProgression,
+      this.settings, this.stats
+    );
   },
 
   resetProgress() {
     Storage.clear();
-    this.deck = new SRSDeck();
-    this.progression = new Progression(this.deck);
-    this.settings = Storage.loadSettings();
-    this.stats = Storage.loadStats();
-    this.session = null;
+    this.deck             = new SRSDeck();
+    this.progression      = new Progression(this.deck);
+    this.chordDeck        = new ChordDeck();
+    this.chordProgression = new ChordProgression(this.chordDeck);
+    this.settings         = Storage.loadSettings();
+    this.stats            = Storage.loadStats();
+    this.session          = null;
     this._save();
     UI.renderHome();
     UI.toast('Progress reset', 'info');
   },
 
   exportData() {
-    const json = Storage.exportJSON(this.deck, this.progression, this.settings, this.stats);
+    const json = Storage.exportJSON(
+      this.deck, this.progression,
+      this.chordDeck, this.chordProgression,
+      this.settings, this.stats
+    );
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -200,10 +259,12 @@ const App = {
   importData(jsonString) {
     try {
       const result = Storage.importJSON(jsonString);
-      this.deck = result.deck;
-      this.progression = result.progression;
-      this.settings = { ...this.settings, ...result.settings };
-      this.stats = { ...this.stats, ...result.stats };
+      this.deck             = result.deck;
+      this.progression      = result.progression;
+      this.chordDeck        = result.chordDeck;
+      this.chordProgression = result.chordProgression;
+      this.settings         = { ...this.settings, ...result.settings };
+      this.stats            = { ...this.stats,    ...result.stats };
       this._save();
       UI.renderHome();
       UI.toast('Progress imported successfully', 'success');

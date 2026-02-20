@@ -84,12 +84,14 @@ const Audio = (() => {
     return Math.round(minRoot + Math.random() * (maxRoot - minRoot));
   }
 
+  // ── Interval playback ──────────────────────────────────────────────────────
+
   // Store exact frequencies for accurate replay
   let lastRootFreq = null;
   let lastIntervalFreq = null;
-  let lastDirection = null;
+  let lastIntervalDirection = null;
 
-  function _playFreqs(rootFreq, intervalFreq, direction) {
+  function _playIntervalFreqs(rootFreq, intervalFreq, direction) {
     const audioCtx = getCtx();
     const now = audioCtx.currentTime + 0.05;
     const noteDuration = 0.65;
@@ -109,16 +111,8 @@ const Audio = (() => {
     return new Promise(resolve => setTimeout(resolve, totalDuration * 1000));
   }
 
-  function replay() {
-    if (lastRootFreq !== null) {
-      return _playFreqs(lastRootFreq, lastIntervalFreq, lastDirection);
-    }
-    return Promise.resolve();
-  }
-
-  // play() picks a random root and stores the exact frequencies for replay
+  // play() picks a random root and stores exact frequencies for replay
   function play(semitones, direction) {
-    const audioCtx = getCtx();
     const rootMidi = pickRoot(semitones, direction);
     const intervalMidi = direction === 'descending'
       ? rootMidi - semitones
@@ -126,10 +120,100 @@ const Audio = (() => {
 
     lastRootFreq = midiToFreq(rootMidi);
     lastIntervalFreq = midiToFreq(intervalMidi);
-    lastDirection = direction;
+    lastIntervalDirection = direction;
+    lastChordFreqs = null; // clear chord replay state
 
-    return _playFreqs(lastRootFreq, lastIntervalFreq, lastDirection);
+    return _playIntervalFreqs(lastRootFreq, lastIntervalFreq, lastIntervalDirection);
   }
 
-  return { unlock, play, replay };
+  // ── Chord playback ─────────────────────────────────────────────────────────
+
+  // Reduced peak gain for chords to prevent clipping with multiple simultaneous notes
+  function buildChordTone(frequency, startTime, duration, audioCtx) {
+    const osc = audioCtx.createOscillator();
+    const filter = audioCtx.createBiquadFilter();
+    const gainNode = audioCtx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(frequency, startTime);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1200, startTime);
+    filter.Q.setValueAtTime(0.7, startTime);
+
+    // Lower peak gain (0.25 vs 0.55) to avoid clipping with 3-4 simultaneous notes
+    const peak = 0.25;
+    const attack = 0.015;
+    const decay = 0.10;
+    const sustainLevel = 0.17;
+    const release = 0.25;
+    const sustainEnd = Math.max(startTime + attack + decay, startTime + duration - release);
+
+    gainNode.gain.setValueAtTime(0, startTime);
+    gainNode.gain.linearRampToValueAtTime(peak, startTime + attack);
+    gainNode.gain.linearRampToValueAtTime(sustainLevel, startTime + attack + decay);
+    gainNode.gain.setValueAtTime(sustainLevel, sustainEnd);
+    gainNode.gain.linearRampToValueAtTime(0, startTime + duration);
+
+    osc.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    osc.start(startTime);
+    osc.stop(startTime + duration + 0.05);
+  }
+
+  let lastChordFreqs = null;
+
+  function _playChordFreqs(freqs) {
+    const audioCtx = getCtx();
+    const now = audioCtx.currentTime + 0.05;
+
+    // Phase 1: block chord (all notes simultaneously)
+    const blockDuration = 0.85;
+    for (const freq of freqs) {
+      buildChordTone(freq, now, blockDuration, audioCtx);
+    }
+
+    // Phase 2: ascending arpeggio (helps the ear isolate individual notes)
+    const arpStart = now + blockDuration + 0.18;
+    const arpSpacing = 0.20;
+    const arpNoteDuration = 0.65;
+    for (let i = 0; i < freqs.length; i++) {
+      buildChordTone(freqs[i], arpStart + i * arpSpacing, arpNoteDuration, audioCtx);
+    }
+
+    const totalDuration = blockDuration + 0.18 + (freqs.length - 1) * arpSpacing + arpNoteDuration + 0.1;
+    return new Promise(resolve => setTimeout(resolve, totalDuration * 1000));
+  }
+
+  // playChord picks a random root in a comfortable mid range
+  function playChord(semitones) {
+    // semitones is an array like [0, 4, 7]
+    const maxOffset = Math.max(...semitones);
+    // Keep all notes in C3–C5 range (MIDI 48–72)
+    const minRoot = 48;
+    const maxRoot = Math.min(67, 72 - maxOffset); // C3 to G4 at most
+    const rootMidi = Math.round(minRoot + Math.random() * (maxRoot - minRoot));
+    const freqs = semitones.map(s => midiToFreq(rootMidi + s));
+
+    lastChordFreqs = freqs;
+    lastRootFreq = null; // clear interval replay state
+
+    return _playChordFreqs(freqs);
+  }
+
+  // ── Unified replay ─────────────────────────────────────────────────────────
+
+  function replay() {
+    if (lastChordFreqs !== null) {
+      return _playChordFreqs(lastChordFreqs);
+    }
+    if (lastRootFreq !== null) {
+      return _playIntervalFreqs(lastRootFreq, lastIntervalFreq, lastIntervalDirection);
+    }
+    return Promise.resolve();
+  }
+
+  return { unlock, play, playChord, replay };
 })();

@@ -95,7 +95,45 @@ main { flex: 1; padding: 24px 0 32px; }
 .btn-icon { padding: 8px; border-radius: 8px; font-size: 1.1rem; }
 
 /* ── HOME SCREEN ─────────────────────────────────────────────── */
-#screen-home {}
+
+/* Module tabs */
+.module-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 24px;
+}
+.module-tab {
+  flex: 1;
+  padding: 9px 16px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-family: var(--font);
+}
+.module-tab:hover { color: var(--text); background: var(--surface2); }
+.module-tab.active { background: var(--accent); color: #fff; }
+
+/* Single-bar mastery row for chords */
+.mastery-bars--single { flex: 1; }
+.mastery-bars--single .mastery-cell { max-width: 220px; }
+
+/* Chord character blurb inside feedback */
+.chord-character {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  font-style: italic;
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
 
 .home-hero {
   text-align: center;
