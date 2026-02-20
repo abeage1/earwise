@@ -174,7 +174,8 @@ const UI = (() => {
 
   // ── FEEDBACK after answer ───────────────────────────────────────────────────
   function renderFeedback(correct, card, selectedIntervalId) {
-    _setButtonsEnabled(false);
+    // Disable answer buttons but keep replay enabled
+    document.querySelectorAll('.answer-btn').forEach(btn => { btn.disabled = true; });
 
     const interval = INTERVAL_MAP[card.intervalId];
     const selected = INTERVAL_MAP[selectedIntervalId];

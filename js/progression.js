@@ -96,12 +96,10 @@ class Progression {
     // Fill queue: due cards, then lowest-mastery cards
     const pool = [...due, ...notDue];
 
-    // Interleave: avoid same interval appearing back-to-back
-    const seen = new Set();
+    // Fill queue from pool (due cards first, then lowest mastery)
     for (const card of pool) {
       if (queue.length >= sessionSize) break;
       queue.push(card);
-      seen.add(card.id);
     }
 
     // If session is smaller than sessionSize, cycle through pool again

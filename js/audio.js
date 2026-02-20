@@ -2,7 +2,6 @@
 
 const Audio = (() => {
   let ctx = null;
-  let stopHandle = null;
 
   function getCtx() {
     if (!ctx || ctx.state === 'closed') {
@@ -85,58 +84,51 @@ const Audio = (() => {
     return Math.round(minRoot + Math.random() * (maxRoot - minRoot));
   }
 
-  // Play an interval. Returns a Promise that resolves when audio is done.
-  // direction: 'ascending' | 'descending' | 'harmonic'
-  // Returns { rootMidi, intervalMidi } so caller knows what was played.
-  function playInterval(semitones, direction) {
+  // Store exact frequencies for accurate replay
+  let lastRootFreq = null;
+  let lastIntervalFreq = null;
+  let lastDirection = null;
+
+  function _playFreqs(rootFreq, intervalFreq, direction) {
+    const audioCtx = getCtx();
+    const now = audioCtx.currentTime + 0.05;
+    const noteDuration = 0.65;
+    const gap = 0.15;
+    let totalDuration;
+
+    if (direction === 'harmonic') {
+      buildTone(rootFreq, now, noteDuration + 0.2, audioCtx);
+      buildTone(intervalFreq, now, noteDuration + 0.2, audioCtx);
+      totalDuration = noteDuration + 0.2 + 0.1;
+    } else {
+      buildTone(rootFreq, now, noteDuration, audioCtx);
+      buildTone(intervalFreq, now + noteDuration + gap, noteDuration, audioCtx);
+      totalDuration = noteDuration + gap + noteDuration + 0.1;
+    }
+
+    return new Promise(resolve => setTimeout(resolve, totalDuration * 1000));
+  }
+
+  function replay() {
+    if (lastRootFreq !== null) {
+      return _playFreqs(lastRootFreq, lastIntervalFreq, lastDirection);
+    }
+    return Promise.resolve();
+  }
+
+  // play() picks a random root and stores the exact frequencies for replay
+  function play(semitones, direction) {
     const audioCtx = getCtx();
     const rootMidi = pickRoot(semitones, direction);
     const intervalMidi = direction === 'descending'
       ? rootMidi - semitones
       : rootMidi + semitones;
 
-    const rootFreq = midiToFreq(rootMidi);
-    const intervalFreq = midiToFreq(intervalMidi);
-
-    const now = audioCtx.currentTime + 0.05; // small scheduling lookahead
-    const noteDuration = 0.65;
-    const gap = 0.15;
-
-    let totalDuration;
-
-    if (direction === 'harmonic') {
-      // Both notes simultaneously
-      buildTone(rootFreq, now, noteDuration + 0.2, audioCtx);
-      buildTone(intervalFreq, now, noteDuration + 0.2, audioCtx);
-      totalDuration = noteDuration + 0.2 + 0.1;
-    } else {
-      // Melodic: root first, then interval note
-      buildTone(rootFreq, now, noteDuration, audioCtx);
-      buildTone(intervalFreq, now + noteDuration + gap, noteDuration, audioCtx);
-      totalDuration = noteDuration + gap + noteDuration + 0.1;
-    }
-
-    return new Promise(resolve => {
-      setTimeout(resolve, totalDuration * 1000);
-    });
-  }
-
-  // Replay — same as playInterval but returns immediately; caller may not need the promise
-  let lastSemitones = null;
-  let lastDirection = null;
-
-  function replay() {
-    if (lastSemitones !== null) {
-      return playInterval(lastSemitones, lastDirection);
-    }
-    return Promise.resolve();
-  }
-
-  // Wrap playInterval to store last-played for replay
-  function play(semitones, direction) {
-    lastSemitones = semitones;
+    lastRootFreq = midiToFreq(rootMidi);
+    lastIntervalFreq = midiToFreq(intervalMidi);
     lastDirection = direction;
-    return playInterval(semitones, direction);
+
+    return _playFreqs(lastRootFreq, lastIntervalFreq, lastDirection);
   }
 
   return { unlock, play, replay };
