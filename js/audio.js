@@ -2,23 +2,25 @@
 
 const Audio = (() => {
   let ctx = null;
+  let resumePromise = null; // tracks in-flight resume()
 
-  // Returns a Promise that resolves with a running AudioContext.
-  // On iOS Safari, AudioContext starts suspended and resume() is async —
-  // we must await it before scheduling any notes.
-  async function getCtx() {
+  // Call SYNCHRONOUSLY from any user-gesture handler (before any awaits).
+  // iOS requires ctx.resume() to be called within the gesture call stack.
+  // Stores the resulting promise so play functions can await it.
+  function unlock() {
     if (!ctx || ctx.state === 'closed') {
       ctx = new (window.AudioContext || window.webkitAudioContext)();
     }
     if (ctx.state === 'suspended') {
-      await ctx.resume();
+      resumePromise = ctx.resume().then(() => { resumePromise = null; });
     }
-    return ctx;
   }
 
-  // Call from any user-gesture handler to pre-warm the AudioContext on iOS.
-  async function unlock() {
-    await getCtx();
+  // Await at the start of any play function to ensure the context is running.
+  async function _ensureRunning() {
+    if (!ctx) unlock();
+    if (resumePromise) await resumePromise;
+    return ctx;
   }
 
   // Build a piano-like tone chain: oscillator → filter → gain → destination
@@ -95,7 +97,7 @@ const Audio = (() => {
   let lastIntervalDirection = null;
 
   async function _playIntervalFreqs(rootFreq, intervalFreq, direction) {
-    const audioCtx = await getCtx();
+    const audioCtx = await _ensureRunning();
     const now = audioCtx.currentTime + 0.05;
     const noteDuration = 0.65;
     const gap = 0.15;
@@ -170,7 +172,7 @@ const Audio = (() => {
   let lastChordArpeggio = true;
 
   async function _playChordFreqs(freqs, playArpeggio) {
-    const audioCtx = await getCtx();
+    const audioCtx = await _ensureRunning();
     const now = audioCtx.currentTime + 0.05;
 
     // Phase 1: block chord (all notes simultaneously)

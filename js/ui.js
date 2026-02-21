@@ -400,7 +400,7 @@ const UI = (() => {
     $('btn-settings-cancel').addEventListener('click', () => renderHome());
     $('btn-play').addEventListener('click',           () => { Audio.unlock(); _app.playCurrentInterval(); });
     $('btn-replay').addEventListener('click',         () => { Audio.unlock(); _app.replayInterval(); });
-    $('btn-next').addEventListener('click',           () => _app.nextQuestion());
+    $('btn-next').addEventListener('click',           () => { Audio.unlock(); _app.nextQuestion(); });
     $('btn-session-again').addEventListener('click',  () => _app.startSession());
     $('btn-home-from-summary').addEventListener('click', () => renderHome());
     $('btn-home-from-question').addEventListener('click', () => {
