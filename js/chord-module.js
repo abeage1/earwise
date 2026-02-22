@@ -134,17 +134,28 @@ class ChordProgression {
     const notDue = active.filter(c => !c.isDue()).sort((a, b) => a.mastery - b.mastery);
     const pool = [...due, ...notDue];
 
+    // Fill to sessionSize by cycling through the pool
     const queue = [];
-    for (const card of pool) {
-      if (queue.length >= sessionSize) break;
-      queue.push(card);
-    }
-
     let i = 0;
     while (queue.length < sessionSize && pool.length > 0) {
       queue.push(pool[i % pool.length]);
       i++;
-      if (i > pool.length * 3) break;
+      if (i > pool.length * 4) break;
+    }
+
+    // Shuffle so the order isn't predictable
+    shuffleArray(queue);
+
+    // Fix any consecutive identical cards (especially noticeable with small pools)
+    for (let i = 1; i < queue.length; i++) {
+      if (queue[i].id === queue[i - 1].id) {
+        for (let j = i + 1; j < queue.length; j++) {
+          if (queue[j].id !== queue[i - 1].id) {
+            [queue[i], queue[j]] = [queue[j], queue[i]];
+            break;
+          }
+        }
+      }
     }
 
     return queue;
