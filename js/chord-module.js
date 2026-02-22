@@ -143,20 +143,9 @@ class ChordProgression {
       if (i > pool.length * 4) break;
     }
 
-    // Shuffle so the order isn't predictable
+    // Shuffle so the order isn't predictable (including same chord back-to-back,
+    // which is fine — preventing it would itself become a cue)
     shuffleArray(queue);
-
-    // Fix any consecutive identical cards (especially noticeable with small pools)
-    for (let i = 1; i < queue.length; i++) {
-      if (queue[i].id === queue[i - 1].id) {
-        for (let j = i + 1; j < queue.length; j++) {
-          if (queue[j].id !== queue[i - 1].id) {
-            [queue[i], queue[j]] = [queue[j], queue[i]];
-            break;
-          }
-        }
-      }
-    }
 
     return queue;
   }
