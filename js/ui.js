@@ -348,9 +348,12 @@ const UI = (() => {
     showScreen('screen-summary');
 
     const pct = total > 0 ? Math.round(correct / total * 100) : 0;
+    const perfect = pct === 100;
     $('summary-score').textContent = `${correct} / ${total}`;
     $('summary-pct').textContent   = `${pct}%`;
-    $('summary-emoji').textContent = pct >= 90 ? '🎉' : pct >= 70 ? '👍' : pct >= 50 ? '💪' : '🔄';
+    $('summary-emoji').textContent = perfect ? '⭐' : pct >= 90 ? '🎉' : pct >= 70 ? '👍' : pct >= 50 ? '💪' : '🔄';
+    $('summary-card').classList.toggle('summary-card--perfect', perfect);
+    $('summary-perfect-label').classList.toggle('hidden', !perfect);
 
     // Pending chord unlocks — show opt-in prompt instead of auto-unlocking
     const unlocksEl = $('summary-unlocks');
