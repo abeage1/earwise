@@ -168,14 +168,11 @@ const UI = (() => {
     feedbackEl.className = 'feedback-area hidden';
     feedbackEl.innerHTML = '';
 
-    // New card badge
+    // New card badge — show direction only, never the name (would give away the answer)
     const newBadge = $('new-badge');
     if (isNewCard) {
-      const label = module === 'chords'
-        ? `New: ${CHORD_MAP[card.intervalId].name}`
-        : `New: ${INTERVAL_MAP[card.intervalId].name} (${card.direction})`;
       newBadge.classList.remove('hidden');
-      newBadge.textContent = label;
+      newBadge.textContent = module === 'chords' ? '★ New chord' : `★ New interval`;
     } else {
       newBadge.classList.add('hidden');
     }
